@@ -115,6 +115,7 @@ export const promptService = {
 
   async create(input: CreatePromptInput): Promise<PromptWithRelations> {
     const { tag_ids, ...promptData } = input;
+    const { data: { session } } = await supabase.auth.getSession();
     const { data: prompt, error } = await supabase
       .from('prompts')
       .insert({
@@ -123,6 +124,7 @@ export const promptService = {
         description: promptData.description ?? null,
         category_id: promptData.category_id ?? null,
         is_favorite: promptData.is_favorite ?? false,
+        owner_id: session?.user?.id ?? null,
       })
       .select()
       .single();

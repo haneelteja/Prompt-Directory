@@ -2,10 +2,15 @@
   "name": "prompt-directory",
   "private": true,
   "version": "1.0.0",
-  "type": "module",
+  "description": "Desktop Prompt Directory - Personal prompt repository with Google Auth",
+  "main": "dist-electron/main.js",
+  "author": "Prompt Directory",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:electron": "tsc -b && vite build && electron-builder",
+    "electron:dev": "tsc -p electron/tsconfig.json && concurrently \"vite\" \"wait-on http://localhost:3000 && electron .\"",
+    "electron:build": "tsc -b && tsc -p electron/tsconfig.json && npx cross-env ELECTRON=true vite build && electron-builder",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -18,13 +23,54 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
     "typescript": "~5.6.2",
-    "vite": "^5.4.10"
+    "vite": "^5.4.10",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.promptdirectory.app",
+    "productName": "Prompt Directory",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "protocols": {
+      "name": "Prompt Directory",
+      "schemes": ["prompt-directory"]
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }

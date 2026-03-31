@@ -29,6 +29,13 @@ export function usePrompts(initialFilters?: PromptFilters) {
     refetch();
   }, [refetch]);
 
+  // Refetch when window regains focus (syncs changes from cloud/other tabs)
+  useEffect(() => {
+    const onFocus = () => refetch();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [refetch]);
+
   const updateFilters = useCallback((newFilters: Partial<PromptFilters>) => {
     setFilters((prev) => ({ ...prev, ...newFilters }));
   }, []);

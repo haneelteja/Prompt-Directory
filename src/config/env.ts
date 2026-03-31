@@ -14,6 +14,8 @@ const getEnv = (key: string, fallback?: string): string => {
 export const env = {
   supabaseUrl: getEnv('VITE_SUPABASE_URL', ''),
   supabaseAnonKey: getEnv('VITE_SUPABASE_ANON_KEY', ''),
+  /** Cloud app URL - used for desktop OAuth redirect (e.g. https://prompt-directory-kappa.vercel.app) */
+  appUrl: getEnv('VITE_APP_URL', ''),
   isDev: import.meta.env.DEV,
   isProd: import.meta.env.PROD,
 } as const;

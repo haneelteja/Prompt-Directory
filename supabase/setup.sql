@@ -1,5 +1,12 @@
 -- Prompt Directory - Full Database Setup
 -- Run this in Supabase Dashboard → SQL Editor → New Query
+--
+-- IMPORTANT: Before using Google Auth, configure in Supabase Dashboard:
+-- 1. Authentication → Providers → Enable Google (add Client ID & Secret)
+-- 2. Authentication → URL Configuration → Add Redirect URLs:
+--    - https://prompt-directory-kappa.vercel.app/auth/callback
+--    - https://prompt-directory-kappa.vercel.app/auth/desktop
+--    - http://localhost:3000/auth/callback (dev)
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -128,3 +135,84 @@ INSERT INTO tags (name, slug) VALUES
   ('email', 'email'),
   ('summary', 'summary')
 ON CONFLICT (slug) DO NOTHING;
+
+-- ============================================
+-- AUTH: Profiles & RLS (Google OAuth)
+-- ============================================
+
+-- Profiles table (extends auth.users with Google details)
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT,
+  full_name TEXT,
+  avatar_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Trigger: create/update profile when user signs up or logs in via Google
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name, avatar_url)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name'),
+    NEW.raw_user_meta_data->>'avatar_url'
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    full_name = EXCLUDED.full_name,
+    avatar_url = EXCLUDED.avatar_url,
+    updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- RLS: Prompts - users see only their own prompts
+ALTER TABLE prompts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own prompts" ON prompts;
+CREATE POLICY "Users can view own prompts"
+  ON prompts FOR SELECT
+  USING (owner_id = auth.uid() OR owner_id IS NULL);
+
+DROP POLICY IF EXISTS "Users can insert own prompts" ON prompts;
+CREATE POLICY "Users can insert own prompts"
+  ON prompts FOR INSERT
+  WITH CHECK (owner_id = auth.uid() OR owner_id IS NULL);
+
+DROP POLICY IF EXISTS "Users can update own prompts" ON prompts;
+CREATE POLICY "Users can update own prompts"
+  ON prompts FOR UPDATE
+  USING (owner_id = auth.uid() OR owner_id IS NULL);
+
+DROP POLICY IF EXISTS "Users can delete own prompts" ON prompts;
+CREATE POLICY "Users can delete own prompts"
+  ON prompts FOR DELETE
+  USING (owner_id = auth.uid() OR owner_id IS NULL);
+
+-- RLS: Profiles
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
+CREATE POLICY "Users can view own profile"
+  ON profiles FOR SELECT
+  USING (id = auth.uid());
+
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+CREATE POLICY "Users can update own profile"
+  ON profiles FOR UPDATE
+  USING (id = auth.uid());
+
+-- Grant auth users ability to insert/update own profile (for first login sync)
+DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
+CREATE POLICY "Users can insert own profile"
+  ON profiles FOR INSERT
+  WITH CHECK (id = auth.uid());
