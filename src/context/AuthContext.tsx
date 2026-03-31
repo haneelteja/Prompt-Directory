@@ -39,9 +39,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
+  const consumeSessionFromUrlHash = useCallback(async (): Promise<boolean> => {
+    if (typeof window === 'undefined' || !window.location.hash) return false;
+
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+
+    if (!accessToken || !refreshToken) return false;
+
+    const { data, error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (error) throw error;
+
+    if (data?.session) {
+      setSession(data.session);
+      setUser(data.session.user);
+      await upsertProfileFromUser(data.session.user);
+    }
+
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    return true;
+  }, []);
+
   const refetch = useCallback(async () => {
     setLoading(true);
     try {
+      const consumedHashSession = await consumeSessionFromUrlHash();
+      if (consumedHashSession) return;
+
       const { data: { session: s } } = await supabase.auth.getSession();
       setSession(s);
       setUser(s?.user ?? null);
@@ -53,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [consumeSessionFromUrlHash]);
 
   useEffect(() => {
     refetch();
