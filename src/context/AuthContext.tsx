@@ -39,6 +39,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
+  const syncProfileInBackground = useCallback((user: User | null) => {
+    if (!user) return;
+    void upsertProfileFromUser(user).catch((err) => {
+      if (!isAbortError(err)) {
+        console.warn('Profile sync failed (non-fatal):', err);
+      }
+    });
+  }, []);
+
   const consumeSessionFromUrlHash = useCallback(async (): Promise<boolean> => {
     if (typeof window === 'undefined' || !window.location.hash) return false;
 
@@ -57,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data?.session) {
       setSession(data.session);
       setUser(data.session.user);
-      await upsertProfileFromUser(data.session.user);
+      syncProfileInBackground(data.session.user);
     }
 
     window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
@@ -73,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: { session: s } } = await supabase.auth.getSession();
       setSession(s);
       setUser(s?.user ?? null);
-      if (s?.user) await upsertProfileFromUser(s.user);
+      syncProfileInBackground(s?.user ?? null);
     } catch (err) {
       if (!isAbortError(err)) {
         throw err;
@@ -81,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [consumeSessionFromUrlHash]);
+  }, [consumeSessionFromUrlHash, syncProfileInBackground]);
 
   useEffect(() => {
     refetch();
@@ -90,9 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           setSession(session);
           setUser(session?.user ?? null);
-          if (session?.user) {
-            await upsertProfileFromUser(session.user);
-          }
+          syncProfileInBackground(session?.user ?? null);
         } catch (err) {
           if (!isAbortError(err)) {
             console.error('Auth state change error:', err);
@@ -103,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
     return () => subscription.unsubscribe();
-  }, [refetch]);
+  }, [refetch, syncProfileInBackground]);
 
   const signInWithGoogle = useCallback(async () => {
     setLoading(true);
@@ -168,7 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!error && data?.session) {
             setSession(data.session);
             setUser(data.session.user);
-            await upsertProfileFromUser(data.session.user);
+            syncProfileInBackground(data.session.user);
           }
         }
       } catch (err) {
@@ -178,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
     return cleanup;
-  }, []);
+  }, [syncProfileInBackground]);
 
   const value: AuthContextValue = {
     user,
