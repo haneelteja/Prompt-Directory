@@ -44,17 +44,25 @@ export function AuthCallbackPage() {
             return;
           }
         } else if (accessToken && refreshToken) {
-          const { error: err } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          if (err) throw err;
+          if (isDesktop) {
+            const { error: err } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            if (err) throw err;
+          } else {
+            window.location.replace('/' + window.location.hash);
+            return;
+          }
         } else {
           throw new Error('No auth data in callback');
         }
         if (!isDesktop) navigate('/', { replace: true });
       } catch (err) {
         if (isAbortError(err)) {
+          if (!isDesktop) {
+            window.location.replace('/' + window.location.hash);
+          }
           return;
         }
         if (isDesktop) {
