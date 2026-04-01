@@ -1,94 +1,70 @@
-# Prompt Directory - Desktop Setup
+# Prompt Directory Desktop Setup
 
-## Tech Stack
+## Overview
 
-| Layer | Technology |
-|-------|------------|
-| Desktop | Electron 33 |
-| Frontend | React 18 + TypeScript + Vite |
-| Auth | Supabase Auth (Google OAuth) |
-| Data | Supabase PostgreSQL |
-| Build | electron-builder |
+The desktop app uses Electron as a shell around the same React app and Supabase backend used by the web app.
 
-## Architecture
+Desktop sign-in flow:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    ELECTRON MAIN PROCESS                         │
-│  - Window management                                              │
-│  - Auth callback server (localhost:42813)                         │
-│  - IPC (getAuthRedirectUrl, openExternal, onAuthCallback)        │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ contextBridge (secure)
-┌────────────────────────────▼────────────────────────────────────┐
-│                    RENDERER (React)                              │
-│  - AuthContext (session, signIn, signOut)                         │
-│  - AuthGuard, LoginPage, AuthCallbackPage                        │
-│  - Prompt CRUD, Search, Versioning                               │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────────┐
-│                    SUPABASE                                     │
-│  - Auth (Google OAuth)                                           │
-│  - PostgreSQL (prompts, profiles, RLS)                          │
-└─────────────────────────────────────────────────────────────────┘
+1. User clicks Google sign in in Electron.
+2. Electron opens the hosted web route `/auth/desktop` in the system browser.
+3. Supabase and Google complete OAuth in the browser.
+4. The hosted app redirects back to the desktop app using the custom protocol:
+   - `prompt-directory://auth/callback`
+5. Electron passes the callback URL to the renderer.
+6. The renderer stores the session with Supabase and loads the app.
+
+## Required Environment Variables
+
+Add these to `.env` before running or building Electron:
+
+```bash
+VITE_SUPABASE_URL=https://<your-project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<your-public-key>
+VITE_APP_URL=https://prompt-directory-mu.vercel.app
 ```
 
-## Google OAuth Flow
-
-1. User clicks "Sign in with Google"
-2. App gets OAuth URL from Supabase
-3. **Electron**: Opens URL in system browser via `shell.openExternal`
-4. **Web**: Redirects to OAuth URL
-5. User signs in on Google
-6. Supabase redirects to callback URL:
-   - **Electron**: `http://localhost:42813/auth/callback` (server in main process)
-   - **Web**: `{origin}/auth/callback`
-7. App exchanges code for session
-8. Session stored in Supabase client (localStorage)
+`VITE_APP_URL` should point to the hosted web app that serves `/auth/desktop` and `/auth/callback`.
 
 ## Supabase Configuration
 
-1. **Enable Google Provider**  
-   - Supabase Dashboard → Authentication → Providers → Google  
-   - Add Google OAuth credentials
+In Supabase Authentication -> URL Configuration:
 
-2. **Add Redirect URLs**  
-   - Authentication → URL Configuration → Redirect URLs  
-   - Add:
-     - `http://localhost:42813/auth/callback` (Electron)
-     - `http://localhost:3000/auth/callback` (dev)
-     - Your production URL + `/auth/callback`
+- Site URL:
+  - `https://prompt-directory-mu.vercel.app`
+- Redirect URLs:
+  - `http://localhost:3000/auth/callback`
+  - `https://prompt-directory-mu.vercel.app/auth/callback`
+  - `https://prompt-directory-mu.vercel.app/auth/desktop`
 
-3. **Run migrations**  
-   - `001_initial_schema.sql`  
-   - `002_auth_profiles_rls.sql`
+In Google Cloud OAuth:
 
-## Development
+- Authorized redirect URI:
+  - `https://<your-project-ref>.supabase.co/auth/v1/callback`
+
+## Local Development
 
 ```bash
 npm install
-cp .env.example .env
-# Edit .env with Supabase credentials
-
-# Run desktop app
 npm run electron:dev
 ```
 
-## Build & Package
+This runs:
+
+- Vite on `http://localhost:3000`
+- Electron pointing at the local renderer
+
+## Desktop Build
 
 ```bash
-# Windows (NSIS installer + portable)
-# macOS (DMG + ZIP)
-# Linux (AppImage + deb)
 npm run electron:build
 ```
 
-Output: `release/` directory
+Build output is written to `release/`.
 
-## Security
+## Security Notes
 
-- **No Node in renderer**: contextIsolation, no nodeIntegration
-- **Preload**: Only exposes getAuthRedirectUrl, openExternal, onAuthCallback
-- **Secrets**: Supabase anon key in .env (safe for client-side)
-- **RLS**: Prompts filtered by owner_id in database
+- No service role key is used in the desktop renderer
+- Electron renderer runs with context isolation
+- Only the minimal preload bridge is exposed
+- OAuth completion uses the custom `prompt-directory://` protocol instead of exposing Node APIs to the renderer

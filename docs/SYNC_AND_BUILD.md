@@ -1,36 +1,41 @@
-# Sync & Windows Build
+# Sync and Build
 
-## Automatic Cloud Sync
+## Cloud Sync
 
-Desktop and cloud use the **same Supabase project**. Data sync is automatic:
+Desktop and web use the same Supabase project, so data sync is automatic.
 
-- **Desktop → Cloud**: When you create/edit/delete in the desktop app, changes are saved to Supabase. Open the cloud app to see them.
-- **Cloud → Desktop**: When you update in the cloud, refocus the desktop window to refetch and see changes.
-- **Same account**: Sign in with the same Google account on both to access the same prompts.
+- Desktop -> Cloud: prompt changes are written to Supabase immediately
+- Cloud -> Desktop: refocusing the desktop window refreshes data
+- Same Google account: both clients see the same prompts
 
-No manual upload or sync step is required.
+No manual import or export step is required.
 
-## Supabase Redirect URLs
+## Web Deployment
 
-Add these in Supabase Dashboard → Authentication → URL Configuration:
+For hosted deploys:
 
-- `https://prompt-directory-kappa.vercel.app/auth/callback`
-- `https://prompt-directory-kappa.vercel.app/auth/desktop`
+- configure `VITE_SUPABASE_URL`
+- configure `VITE_SUPABASE_ANON_KEY`
+- configure `VITE_APP_URL`
+- keep `vercel.json` in place so `/auth/callback` is routed to `index.html`
 
-## Building Windows .exe Installer
+## Windows Build
 
 ```bash
-# Set env vars (or use .env)
-$env:VITE_SUPABASE_URL="https://warmxfpiwotahrymwcth.supabase.co"
-$env:VITE_SUPABASE_ANON_KEY="your-key"
-$env:VITE_APP_URL="https://prompt-directory-kappa.vercel.app"
+$env:VITE_SUPABASE_URL="https://<your-project-ref>.supabase.co"
+$env:VITE_SUPABASE_ANON_KEY="<your-public-key>"
+$env:VITE_APP_URL="https://prompt-directory-mu.vercel.app"
 
 npm run electron:build
 ```
 
-**Output** (in `release/` folder):
+Output in `release/`:
 
-- `Prompt Directory Setup x.x.x.exe` – NSIS installer (recommended)
-- `Prompt Directory x.x.x.exe` – Portable (no install)
+- `Prompt Directory Setup x.x.x.exe`
+- `Prompt Directory x.x.x.exe`
 
-Run the Setup .exe to install on Windows PCs.
+## Recommended Release Practice
+
+- Do not commit generated `release/` or `dist-electron/` artifacts to git
+- Build installers in CI or locally when needed
+- Publish installers as release assets instead of storing them in the main source history
