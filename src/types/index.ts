@@ -53,3 +53,4 @@ export interface PromptWithRelations extends Prompt {
 }
 
 export type PromptVisibility = 'personal' | 'team' | 'public';
+export type PromptLayout = 'grid' | 'list' | 'table';
