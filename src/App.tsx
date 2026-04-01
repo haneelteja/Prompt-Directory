@@ -9,6 +9,7 @@ import { PromptDetail } from '@/components/prompts/PromptDetail';
 import { LoginPage } from '@/pages/LoginPage';
 import { AuthCallbackPage } from '@/pages/AuthCallbackPage';
 import { AuthDesktopPage } from '@/pages/AuthDesktopPage';
+import { HealthPage } from '@/pages/HealthPage';
 import { env } from '@/config/env';
 
 function MissingEnvPage() {
@@ -50,6 +51,7 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+          <Route path="/health" element={<HealthPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/auth/desktop" element={<AuthDesktopPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
